@@ -56,11 +56,14 @@ class Genre(Base):
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
     movies: Mapped[list["MovieModel"]] = relationship(
-        "Movie",
+        "MovieModel",
         secondary=MovieGenresTable,
         back_populates="genres",
         lazy="selectin",
     )
+
+    def __repr__(self) -> str:
+        return f"<Genre(id={self.id}, name={self.name!r})>"
 
 
 class Star(Base):
@@ -70,11 +73,14 @@ class Star(Base):
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
     movies: Mapped[list["MovieModel"]] = relationship(
-        "Movie",
+        "MovieModel",
         secondary=MovieStarsTable,
         back_populates="stars",
         lazy="selectin",
     )
+
+    def __repr__(self) -> str:
+        return f"<Star(id={self.id}, name={self.name!r})>"
 
 
 class Director(Base):
@@ -84,11 +90,14 @@ class Director(Base):
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
     movies: Mapped[list["MovieModel"]] = relationship(
-        "Movie",
+        "MovieModel",
         secondary=MovieDirectorsTable,
         back_populates="directors",
         lazy="selectin",
     )
+
+    def __repr__(self) -> str:
+        return f"<Certification(id={self.id}, name={self.name!r})>"
 
 
 class Certification(Base):
@@ -98,7 +107,7 @@ class Certification(Base):
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
 
     movies: Mapped[list["MovieModel"]] = relationship(
-        "Movie",
+        "MovieModel",
         back_populates="certification",
         lazy="selectin",
     )
@@ -130,7 +139,9 @@ class MovieModel(Base):
 
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
-    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2, asdecimal=True), nullable=False
+    )
 
     certification_id: Mapped[int] = mapped_column(
         ForeignKey("certifications.id", ondelete="RESTRICT"),
@@ -172,3 +183,17 @@ class MovieModel(Base):
         CheckConstraint("price >= 0", name="ck_movies_price_nonneg"),
         Index("ix_movies_name_year", "name", "year"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<MovieModel("
+            f"id={self.id}, "
+            f"uuid={self.uuid}, "
+            f"name={self.name!r}, "
+            f"year={self.year}, "
+            f"time={self.time}, "
+            f"imdb={self.imdb}, "
+            f"votes={self.votes}, "
+            f"price={self.price}"
+            f")>"
+        )

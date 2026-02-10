@@ -10,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
 
 from src.database.models.base import Base
-from src.database.models.payments import Payment, PaymentItem
 
 if TYPE_CHECKING:
     from src.database.models.accounts import UserModel
@@ -48,7 +47,7 @@ class Order(Base):
     status: Mapped[StatusEnum] = mapped_column(
         SQLEnum(StatusEnum),
         nullable=False,
-        server_default="pending",
+        server_default="PENDING",
     )
 
     total_amount: Mapped[Optional[Decimal]] = mapped_column(

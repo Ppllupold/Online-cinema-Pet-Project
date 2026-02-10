@@ -5,16 +5,22 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, CheckConstraint, Index, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    CheckConstraint,
+    Index,
+    func,
+)
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from src.database.models import UserModel
 from src.database.models.base import Base
-from src.database.models.orders import OrderItem, Order
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from src.database.models.accounts import UserModel
     from src.database.models.orders import Order, OrderItem
@@ -52,7 +58,7 @@ class Payment(Base):
     status: Mapped[PaymentStatusEnum] = mapped_column(
         SQLEnum(PaymentStatusEnum, name="payment_status_enum"),
         nullable=False,
-        server_default="successful",
+        server_default="SUCCESSFUL",
     )
 
     amount: Mapped[Decimal] = mapped_column(
@@ -129,5 +135,7 @@ class PaymentItem(Base):
 
     __table_args__ = (
         CheckConstraint("price_at_payment >= 0", name="ck_payment_items_price_nonneg"),
-        UniqueConstraint("payment_id", "order_item_id", name="uq_payment_items_payment_order_item"),
+        UniqueConstraint(
+            "payment_id", "order_item_id", name="uq_payment_items_payment_order_item"
+        ),
     )

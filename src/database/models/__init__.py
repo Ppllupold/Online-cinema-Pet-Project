@@ -20,3 +20,7 @@ from .movies import (
 )
 
 from .shopping import Cart, CartItem
+
+from .orders import Order, OrderItem
+
+from .payments import Payment, PaymentItem

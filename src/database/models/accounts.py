@@ -17,6 +17,7 @@ from src.security.utils import generate_secure_token
 if TYPE_CHECKING:
     from src.database.models.shopping import Cart
     from src.database.models.orders import Order
+    from src.database.models.payments import Payment
 
 
 class UserGroupEnum(str, Enum):
@@ -122,6 +123,12 @@ class UserModel(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+
+    payments: Mapped[list["Payment"]] = relationship(
+        "Payment",
+        back_populates="user",
+        lazy="selectin",
     )
     @classmethod
     def create(cls, email: str, raw_password: str, group_id: int) -> "UserModel":

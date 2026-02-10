@@ -74,7 +74,11 @@ class UserModel(Base):
         ForeignKey("user_groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    group: Mapped["UserGroup"] = relationship("UserGroup", back_populates="users",lazy="selectin",)
+    group: Mapped["UserGroup"] = relationship(
+        "UserGroup",
+        back_populates="users",
+        lazy="selectin",
+    )
 
     activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
         "ActivationTokenModel",
@@ -130,6 +134,7 @@ class UserModel(Base):
         back_populates="user",
         lazy="selectin",
     )
+
     @classmethod
     def create(cls, email: str, raw_password: str, group_id: int) -> "UserModel":
         user = cls(email=email, group_id=group_id)

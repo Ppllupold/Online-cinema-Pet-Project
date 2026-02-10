@@ -1,27 +1,29 @@
 from __future__ import annotations
 
-import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy import engine_from_config, pool
 
 from src.config.settings import get_settings
 from src.database.models.base import Base
 import src.database.models  # noqa: F401
 
 config = context.config
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 settings = get_settings()
 
+# Metadata для autogenerate
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = str(settings.DATABASE_URL)
+
+    url = settings.sync_db_url
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -34,34 +36,28 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection) -> None:
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        compare_type=True,
-    )
+def run_migrations_online() -> None:
+    config.set_main_option("sqlalchemy.url", settings.sync_db_url)
 
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_migrations_online() -> None:
-    connectable: AsyncEngine = create_async_engine(
-        str(settings.DATABASE_URL),
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        future=True,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+        )
 
-    await connectable.dispose()
-
-
-def run_migrations_online_sync_entrypoint() -> None:
-    asyncio.run(run_migrations_online())
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online_sync_entrypoint()
+    run_migrations_online()

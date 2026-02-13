@@ -102,3 +102,4 @@ class MovieDetailResponse(MoviesBase):
     genres: list[GenreListResponse]
     stars: list[StarListResponse]
     directors: list[DirectorForMoviesSchema]
+

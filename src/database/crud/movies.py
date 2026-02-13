@@ -292,3 +292,16 @@ async def get_movies_list(
     items = [MoviesListItem.model_validate(m) for m in movies]
 
     return MovieListResponse(items=items, pagination=pagination)
+
+
+async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieDetailResponse:
+    movie = await db.scalar(
+        select(MovieModel)
+        .options(
+            selectinload(MovieModel.genres),
+            selectinload(MovieModel.stars),
+            # ...
+        )
+        .where(MovieModel.id == movie_id)
+    )
+    return MovieDetailResponse(**movie)

@@ -143,7 +143,7 @@ class UserModel(Base):
         lazy="selectin",
     )
     favorite_movies: Mapped[list["MovieModel"]] = relationship(
-        "MovieMode",
+        "MovieModel",
         secondary="favorites",
         lazy="selectin",
     )

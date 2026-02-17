@@ -12,7 +12,6 @@ app.include_router(stars_router, prefix="/api/v1", tags=["Stars"])
 app.include_router(genres_router, prefix="/api/v1", tags=["Genres"])
 
 
-
 # Health check
 @app.get("/", tags=["Health"])
 async def root():
@@ -30,6 +29,7 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from src.database.models.payments import Payment
     from src.database.models import MovieModel
 
+
 class UserGroupEnum(str, Enum):
     USER = "user"
     ADMIN = "admin"
@@ -30,6 +31,7 @@ class UserGroupEnum(str, Enum):
 class GenderEnum(str, Enum):
     MAN = "man"
     WOMAN = "woman"
+
 
 FavoriteMoviesTable = Table(
     "favorites",
@@ -147,6 +149,7 @@ class UserModel(Base):
         secondary="favorites",
         lazy="selectin",
     )
+
     @classmethod
     def create(cls, email: str, raw_password: str, group_id: int) -> "UserModel":
         user = cls(email=email, group_id=group_id)

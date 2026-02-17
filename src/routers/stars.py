@@ -26,10 +26,7 @@ async def get_star(star_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=StarDetailResponse, status_code=201)
-async def create_star(
-    schema: StarCreate,
-    db: AsyncSession = Depends(get_db)
-):
+async def create_star(schema: StarCreate, db: AsyncSession = Depends(get_db)):
     star = await stars_crud.create_star(db, schema)
     await db.commit()
     return StarDetailResponse.model_validate(star)
@@ -37,9 +34,7 @@ async def create_star(
 
 @router.patch("/{star_id}", response_model=StarDetailResponse)
 async def update_star(
-    star_id: int,
-    schema: StarUpdate,
-    db: AsyncSession = Depends(get_db)
+    star_id: int, schema: StarUpdate, db: AsyncSession = Depends(get_db)
 ):
     star = await stars_crud.update_star(db, star_id, schema)
     await db.commit()

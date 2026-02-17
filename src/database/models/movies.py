@@ -45,6 +45,7 @@ MovieDirectorsTable = Table(
     ),
 )
 
+
 # --- Lookup tables ---
 class Genre(Base):
     __tablename__ = "genres"

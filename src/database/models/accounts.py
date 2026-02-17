@@ -6,8 +6,9 @@ from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, Date, Text, Integer
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import func, ForeignKey, UniqueConstraint
+from sqlalchemy import func, ForeignKey, UniqueConstraint, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 
 from src.database.models.base import Base
 from src.database.validators.accounts import validate_password_strength
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     from src.database.models.shopping import Cart
     from src.database.models.orders import Order
     from src.database.models.payments import Payment
-
+    from src.database.models import MovieModel
 
 class UserGroupEnum(str, Enum):
     USER = "user"
@@ -29,6 +30,13 @@ class UserGroupEnum(str, Enum):
 class GenderEnum(str, Enum):
     MAN = "man"
     WOMAN = "woman"
+
+FavoriteMoviesTable = Table(
+    "favorites",
+    Base.metadata,
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("movie_id", ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class UserGroup(Base):
@@ -134,7 +142,11 @@ class UserModel(Base):
         back_populates="user",
         lazy="selectin",
     )
-
+    favorite_movies: Mapped[list["MovieModel"]] = relationship(
+        "MovieMode",
+        secondary="favorites",
+        lazy="selectin",
+    )
     @classmethod
     def create(cls, email: str, raw_password: str, group_id: int) -> "UserModel":
         user = cls(email=email, group_id=group_id)

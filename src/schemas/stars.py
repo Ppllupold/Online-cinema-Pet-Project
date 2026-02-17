@@ -1,28 +1,25 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class GenreBase(BaseModel):
+class StarBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
 
 
-class GenreCreate(GenreBase):
+class StarCreate(StarBase):
     pass
 
 
-class GenreUpdate(BaseModel):
+class StarUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
 
 
-class GenreListResponse(GenreBase):
+class StarListResponse(StarBase):
     id: int
-    movie_count: int
-    movies_url: str
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class GenreDetailResponse(GenreBase):
+class StarDetailResponse(StarBase):
     id: int
-    movie_count: int
 
     model_config = ConfigDict(from_attributes=True)

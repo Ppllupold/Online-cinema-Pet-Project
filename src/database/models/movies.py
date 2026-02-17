@@ -13,8 +13,6 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     CheckConstraint,
-    DateTime,
-    func,
     Numeric,
     Index,
 )
@@ -46,7 +44,6 @@ MovieDirectorsTable = Table(
         "director_id", ForeignKey("directors.id", ondelete="CASCADE"), primary_key=True
     ),
 )
-
 
 # --- Lookup tables ---
 class Genre(Base):

@@ -103,3 +103,21 @@ class MovieDetailResponse(MoviesBase):
     stars: list[StarListResponse]
     directors: list[DirectorForMoviesSchema]
 
+
+class MovieCreate(BaseModel):
+    name: str
+    year: int
+    time: int
+    imdb: float
+    votes: int
+    price: Decimal
+
+    description: str
+    meta_score: float | None = None
+    gross: float | None = None
+
+    certification_id: int
+    genre_ids: list[int]
+    star_ids: list[int]
+    director_ids: list[int]
+

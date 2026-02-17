@@ -15,14 +15,16 @@ from src.database.models.movies import (
     Director,
     MovieGenresTable,
     MovieStarsTable,
-    MovieDirectorsTable,
+    MovieDirectorsTable, Certification,
 )
+from src.database.models.accounts import FavoriteMoviesTable
 from src.schemas.movies import (
     MovieFilterSchema,
     MovieListResponse,
     MoviesListItem,
     PaginationSchema,
     MovieDetailResponse,
+    MovieCreate,
 )
 
 DEFAULT_PER_PAGE = 10
@@ -49,6 +51,7 @@ def _get_sort_column(sort: SortField):
 
 
 def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
+
     stmt: Select = select(MovieModel)
 
     if filters.q is not None:
@@ -207,6 +210,8 @@ async def get_movies_list(
     filters: MovieFilterSchema | None = None,
     sort: SortField = "imdb",
     order: SortOrder = "desc",
+    favorites: bool = False,
+    user_id: int | None = None,
 ) -> MovieListResponse:
 
     # 1. Перевіряємо коректність параметрів пагінації
@@ -220,6 +225,12 @@ async def get_movies_list(
 
     # 3. Будуємо відфільтрований SELECT (ще не виконуємо)
     base_stmt = _build_filtered_stmt(filters)
+    if favorites and user_id:
+        base_stmt = base_stmt.join(
+            FavoriteMoviesTable,
+            (FavoriteMoviesTable.c.movie_id == MovieModel.id),
+            (FavoriteMoviesTable.c.user_id == user_id),
+        )
 
     # 4. Будуємо ids_subquery — використовується двічі нижче.
     #    Це ключова оптимізація: раніше subquery будувалась окремо
@@ -305,3 +316,42 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieDetailRespons
         .where(MovieModel.id == movie_id)
     )
     return MovieDetailResponse(**movie)
+
+
+async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieDetailResponse:
+    certification: Certification | None = await db.get(Certification, schema.certification_id)
+    if not certification:
+        raise HTTPException(status_code=404, detail="Certification not found")
+
+    genres = (await db.scalars(
+        select(Genre).where(Genre.id.in_(schema.genre_ids))
+    )).all()
+    if len(genres) != len(schema.genre_ids):
+        raise HTTPException(status_code=404, detail="Some genres not found")
+
+    stars = (await db.scalars(
+        select(Star).where(Star.id.in_(schema.star_ids))
+    )).all()
+    if len(stars) != len(schema.star_ids):
+        raise HTTPException(status_code=404, detail="Some stars not found")
+
+    directors = (await db.scalars(
+        select(Director).where(Director.id.in_(schema.director_ids))
+    )).all()
+    if len(directors) != len(schema.director_ids):
+        raise HTTPException(status_code=404, detail="Some directors not found")
+
+    movie = MovieModel(
+        **schema.model_dump(exclude={"genre_ids", "star_ids", "director_ids", "certification_id"}),
+        certification=certification,
+        genres=list(genres),
+        stars=list(stars),
+        directors=list(directors),
+    )
+
+    db.add(movie)
+    await db.flush()
+    await db.refresh(movie)
+
+    return MovieDetailResponse.model_validate(movie)
+

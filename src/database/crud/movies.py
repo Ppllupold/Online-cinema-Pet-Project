@@ -15,7 +15,8 @@ from src.database.models.movies import (
     Director,
     MovieGenresTable,
     MovieStarsTable,
-    MovieDirectorsTable, Certification,
+    MovieDirectorsTable,
+    Certification,
 )
 from src.database.models.accounts import FavoriteMoviesTable
 from src.schemas.movies import (
@@ -25,6 +26,7 @@ from src.schemas.movies import (
     PaginationSchema,
     MovieDetailResponse,
     MovieCreate,
+    MovieUpdate,
 )
 
 DEFAULT_PER_PAGE = 10
@@ -319,30 +321,32 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieDetailRespons
 
 
 async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieDetailResponse:
-    certification: Certification | None = await db.get(Certification, schema.certification_id)
+    certification: Certification | None = await db.get(
+        Certification, schema.certification_id
+    )
     if not certification:
         raise HTTPException(status_code=404, detail="Certification not found")
 
-    genres = (await db.scalars(
-        select(Genre).where(Genre.id.in_(schema.genre_ids))
-    )).all()
+    genres = (
+        await db.scalars(select(Genre).where(Genre.id.in_(schema.genre_ids)))
+    ).all()
     if len(genres) != len(schema.genre_ids):
         raise HTTPException(status_code=404, detail="Some genres not found")
 
-    stars = (await db.scalars(
-        select(Star).where(Star.id.in_(schema.star_ids))
-    )).all()
+    stars = (await db.scalars(select(Star).where(Star.id.in_(schema.star_ids)))).all()
     if len(stars) != len(schema.star_ids):
         raise HTTPException(status_code=404, detail="Some stars not found")
 
-    directors = (await db.scalars(
-        select(Director).where(Director.id.in_(schema.director_ids))
-    )).all()
+    directors = (
+        await db.scalars(select(Director).where(Director.id.in_(schema.director_ids)))
+    ).all()
     if len(directors) != len(schema.director_ids):
         raise HTTPException(status_code=404, detail="Some directors not found")
 
     movie = MovieModel(
-        **schema.model_dump(exclude={"genre_ids", "star_ids", "director_ids", "certification_id"}),
+        **schema.model_dump(
+            exclude={"genre_ids", "star_ids", "director_ids", "certification_id"}
+        ),
         certification=certification,
         genres=list(genres),
         stars=list(stars),
@@ -355,3 +359,68 @@ async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieDetailResp
 
     return MovieDetailResponse.model_validate(movie)
 
+
+async def update_movie(
+    movie_id: int, schema: MovieUpdate, db: AsyncSession
+) -> MovieDetailResponse:
+    movie = await db.get(MovieModel, movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    update_data = schema.model_dump(exclude_unset=True)
+
+    if "certification_id" in update_data:
+        certification = await db.get(Certification, update_data["certification_id"])
+        if not certification:
+            raise HTTPException(status_code=404, detail="Certification not found")
+        movie.certification = certification
+        update_data.pop("certification_id")
+
+    if "genre_ids" in update_data:
+        genres = (
+            await db.scalars(
+                select(Genre).where(Genre.id.in_(update_data["genre_ids"]))
+            )
+        ).all()
+        if len(genres) != len(update_data["genre_ids"]):
+            raise HTTPException(status_code=404, detail="Some genres not found")
+        movie.genres = list(genres)
+        update_data.pop("genre_ids")
+
+    if "star_ids" in update_data:
+        stars = (
+            await db.scalars(select(Star).where(Star.id.in_(update_data["star_ids"])))
+        ).all()
+        if len(stars) != len(update_data["star_ids"]):
+            raise HTTPException(status_code=404, detail="Some stars not found")
+        movie.stars = list(stars)
+        update_data.pop("star_ids")
+
+    if "director_ids" in update_data:
+        directors = (
+            await db.scalars(
+                select(Director).where(Director.id.in_(update_data["director_ids"]))
+            )
+        ).all()
+        if len(directors) != len(update_data["director_ids"]):
+            raise HTTPException(status_code=404, detail="Some directors not found")
+        movie.directors = list(directors)
+        update_data.pop("director_ids")
+
+    for field, value in update_data.items():
+        setattr(movie, field, value)
+
+    await db.flush()
+    await db.refresh(movie)
+
+    return MovieDetailResponse.model_validate(movie)
+
+
+async def delete_movie(movie_id: int, db: AsyncSession):
+    movie = await db.get(MovieModel, movie_id)
+    if not movie:
+        raise HTTPException(404, detail="Movie not found")
+
+    # TODO: Add purchased check when PurchasedMovies table is ready
+    await db.delete(movie)
+    await db.flush()

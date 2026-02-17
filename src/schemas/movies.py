@@ -105,19 +105,34 @@ class MovieDetailResponse(MoviesBase):
 
 
 class MovieCreate(BaseModel):
-    name: str
-    year: int
-    time: int
-    imdb: float
-    votes: int
-    price: Decimal
-
-    description: str
-    meta_score: float | None = None
-    gross: float | None = None
+    name: str = Field(..., min_length=1, max_length=255)
+    year: int = Field(..., ge=1888)
+    time: int = Field(..., gt=0)
+    imdb: float = Field(..., ge=0, le=10)
+    votes: int = Field(..., ge=0)
+    price: Decimal = Field(..., ge=0)
+    description: str = Field(..., min_length=1)
+    meta_score: float | None = Field(None, ge=0, le=100)
+    gross: float | None = Field(None, ge=0)
 
     certification_id: int
-    genre_ids: list[int]
-    star_ids: list[int]
-    director_ids: list[int]
+    genre_ids: list[int] = Field(..., min_length=1)
+    star_ids: list[int] = Field(..., min_length=1)
+    director_ids: list[int] = Field(..., min_length=1)
 
+
+class MovieUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    year: int | None = Field(None, ge=1888)
+    time: int | None = Field(None, gt=0)
+    imdb: float | None = Field(None, ge=0, le=10)
+    votes: int | None = Field(None, ge=0)
+    price: Decimal | None = Field(None, ge=0)
+    description: str | None = Field(None, min_length=1)
+    meta_score: float | None = Field(None, ge=0, le=100)
+    gross: float | None = Field(None, ge=0)
+
+    certification_id: int | None = None
+    genre_ids: list[int] | None = Field(None, min_length=1)
+    star_ids: list[int] | None = Field(None, min_length=1)
+    director_ids: list[int] | None = Field(None, min_length=1)

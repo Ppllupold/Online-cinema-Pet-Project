@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.crud import genres as genres_crud
-from src.config.dependencies import get_db
+from src.dependencies.db import get_db
 from src.schemas.genres import (
     GenreCreate,
     GenreUpdate,

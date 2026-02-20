@@ -69,10 +69,7 @@ class CartItem(Base):
         back_populates="cart_items",
     )
 
-    movie: Mapped["MovieModel"] = relationship(
-        "MovieModel",
-        lazy="selectin"
-    )
+    movie: Mapped["MovieModel"] = relationship("MovieModel", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("cart_id", "movie_id", name="uq_cart_items_cart_id_movie_id"),

@@ -71,6 +71,7 @@ class CartItem(Base):
 
     movie: Mapped["MovieModel"] = relationship(
         "MovieModel",
+        lazy="selectin"
     )
 
     __table_args__ = (

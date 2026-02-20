@@ -98,9 +98,7 @@ class OrderItem(Base):
         nullable=False,
         index=True,
     )
-    movie: Mapped["MovieModel"] = relationship(
-        "MovieModel",
-    )
+    movie: Mapped["MovieModel"] = relationship("MovieModel", lazy="selectin")
 
     price_at_order: Mapped[Decimal] = mapped_column(
         Numeric(10, 2, asdecimal=True),

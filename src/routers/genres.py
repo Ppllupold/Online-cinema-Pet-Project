@@ -61,7 +61,6 @@ async def update_genre(
     genre_id: int, schema: GenreUpdate, db: AsyncSession = Depends(get_db)
 ):
     genre = await genres_crud.update_genre(db, genre_id, schema)
-    await db.commit()
 
     movie_count = await genres_crud.get_genre_movie_count(db, genre.id)
     return GenreDetailResponse(
@@ -74,4 +73,3 @@ async def update_genre(
 @router.delete("/{genre_id}", status_code=204)
 async def delete_genre(genre_id: int, db: AsyncSession = Depends(get_db)):
     await genres_crud.delete_genre(db, genre_id)
-    await db.commit()

@@ -8,6 +8,8 @@ from sqlalchemy import Select, distinct, func, select, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database.crud.shopping import check_movie_purchased
+from src.database.models import OrderItem, Order
 from src.database.models.movies import (
     MovieModel,
     Genre,
@@ -19,6 +21,7 @@ from src.database.models.movies import (
     Certification,
 )
 from src.database.models.accounts import FavoriteMoviesTable
+from src.database.models.orders import StatusEnum
 from src.schemas.movies import (
     MovieFilterSchema,
     MovieListResponse,
@@ -307,7 +310,7 @@ async def get_movies_list(
     return MovieListResponse(items=items, pagination=pagination)
 
 
-async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieDetailResponse:
+async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieModel:
     movie = await db.scalar(
         select(MovieModel)
         .options(
@@ -317,10 +320,10 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieDetailRespons
         )
         .where(MovieModel.id == movie_id)
     )
-    return MovieDetailResponse(**movie)
+    return movie
 
 
-async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieDetailResponse:
+async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieModel:
     certification: Certification | None = await db.get(
         Certification, schema.certification_id
     )
@@ -357,12 +360,12 @@ async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieDetailResp
     await db.flush()
     await db.refresh(movie)
 
-    return MovieDetailResponse.model_validate(movie)
+    return movie
 
 
 async def update_movie(
     movie_id: int, schema: MovieUpdate, db: AsyncSession
-) -> MovieDetailResponse:
+) -> MovieModel:
     movie = await db.get(MovieModel, movie_id)
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
@@ -413,14 +416,12 @@ async def update_movie(
     await db.flush()
     await db.refresh(movie)
 
-    return MovieDetailResponse.model_validate(movie)
+    return movie
 
 
 async def delete_movie(movie_id: int, db: AsyncSession):
     movie = await db.get(MovieModel, movie_id)
     if not movie:
         raise HTTPException(404, detail="Movie not found")
-
-    # TODO: Add purchased check when PurchasedMovies table is ready
     await db.delete(movie)
     await db.flush()

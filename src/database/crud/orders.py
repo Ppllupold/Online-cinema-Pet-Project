@@ -12,21 +12,9 @@ from src.schemas.orders import OrderListItem, OrderItemShort
 # crud/orders.py
 
 
-async def get_orders(user_id: int, db: AsyncSession) -> list[OrderListItem]:
-    orders = (await db.scalars(select(Order).where(Order.user_id == user_id))).all()
-
-    return [
-        OrderListItem(
-            created_at=order.created_at,
-            status=order.status,
-            total_amount=order.total_amount,
-            items=[
-                OrderItemShort(movie_name=item.movie.name, price=item.price_at_order)
-                for item in order.order_items
-            ],
-        )
-        for order in orders
-    ]
+async def get_orders(user_id: int, db: AsyncSession) -> list[Order]:
+    orders = await db.scalars(select(Order).where(Order.user_id == user_id))
+    return list(orders.all())
 
 
 async def place_order(cart: Cart, db: AsyncSession) -> Order:

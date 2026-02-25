@@ -7,42 +7,43 @@ from src.dependencies.db import get_db
 from src.database.models.accounts import UserModel
 from src.database.models.shopping import Cart
 from src.config.settings import get_settings
+from src.services.jwt import jwt_manager
 
 settings = get_settings()
 security = HTTPBearer()
 
-SECRET_KEY = "your-secret-key-here"  # TODO: винести в .env
+SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: AsyncSession = Depends(get_db),
 ) -> UserModel:
-
     token = credentials.credentials
 
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+        user_id = jwt_manager.verify_access_token(token)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    user: UserModel | None = await db.get(UserModel, user_id)
-    if user is None:
-        raise credentials_exception
+    user = await db.get(UserModel, user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="User is not active"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is not active",
         )
 
     return user

@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.crud import accounts as accounts_crud
+from src.database.models import UserModel
+from src.dependencies.auth import get_current_user
 from src.dependencies.db import get_db
-from src.schemas.accounts import UserRegisterSchema, RenewActivationRequest
+from src.schemas.accounts import UserRegisterSchema, RenewActivationRequest, TokenResponse, LoginRequest, \
+    AccessTokenResponse, RefreshTokenRequest
 from src.services.email import send_activation_email
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
@@ -44,3 +47,51 @@ async def renew_activation_link(
         }
 
     return {"message": "New activation link has been sent to your email."}
+
+@router.post("/login", response_model=TokenResponse)
+async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
+    user = await accounts_crud.authenticate_user(
+        db, credentials.email, credentials.password
+    )
+
+    access_token, refresh_token = await accounts_crud.create_tokens_for_user(db, user)
+
+    await db.commit()
+
+    return TokenResponse(
+        access_token=access_token, refresh_token=refresh_token, token_type="bearer"
+    )
+
+
+@router.post("/refresh", response_model=AccessTokenResponse)
+async def refresh_token(
+    request: RefreshTokenRequest, db: AsyncSession = Depends(get_db)
+):
+    new_access_token = await accounts_crud.refresh_access_token(db, request.refresh_token)
+
+    return AccessTokenResponse(access_token=new_access_token, token_type="bearer")
+
+
+@router.post("/logout", status_code=204)
+async def logout(request: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    await accounts_crud.revoke_refresh_token(db, request.refresh_token)
+    await db.commit()
+
+
+@router.post("/logout-all", status_code=204)
+async def logout_all_devices(
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await accounts_crud.revoke_all_user_tokens(db, current_user.id)
+    await db.commit()
+
+
+@router.get("/me")
+async def get_current_user_info(current_user: UserModel = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at,
+    }

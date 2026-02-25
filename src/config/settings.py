@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int
     DB_POOL_TIMEOUT: int
 
+    STRIPE_SECRET_KEY: str
+    STRIPE_PUBLISHABLE_KEY: str
+    STRIPE_WEBHOOK_SECRET: str
+
+    SENDGRID_API_KEY: str
+    SEDGRID_FROM_EMAIL = str
+    DOMAIN: str = "http://127.0.0.1:8000 "
+
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 хвилин
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 днів
+
     @property
     def async_db_url(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

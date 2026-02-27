@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 
 class PaymentStatusEnum(str, Enum):
+    PENDING = "PENDING"
     SUCCESSFUL = "successful"
     CANCELED = "canceled"
     REFUNDED = "refunded"
@@ -58,7 +59,7 @@ class Payment(Base):
     status: Mapped[PaymentStatusEnum] = mapped_column(
         SQLEnum(PaymentStatusEnum, name="payment_status_enum"),
         nullable=False,
-        server_default="SUCCESSFUL",
+        server_default="pending",
     )
 
     amount: Mapped[Decimal] = mapped_column(

@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr, field_validator
 import re
 
+from src.security.passwords import validate_password_strength
+
 
 class UserRegisterSchema(BaseModel):
     email: EmailStr
@@ -9,19 +11,7 @@ class UserRegisterSchema(BaseModel):
     @classmethod
     @field_validator("password", mode="before")
     def validate_password(cls, password):
-        if len(password) < 8:
-            raise ValueError("Password must contain at least 8 characters.")
-        if not re.search(r"[A-Z]", password):
-            raise ValueError("Password must contain at least one uppercase letter.")
-        if not re.search(r"[a-z]", password):
-            raise ValueError("Password must contain at least one lower letter.")
-        if not re.search(r"\d", password):
-            raise ValueError("Password must contain at least one digit.")
-        if not re.search(r"[@$!%*?&#]", password):
-            raise ValueError(
-                "Password must contain at least one special character: @, $, !, %, *, ?, #, &."
-            )
-        return password
+        return validate_password_strength(password)
 
     @classmethod
     @field_validator("email", mode="before")
@@ -51,3 +41,27 @@ class RefreshTokenRequest(BaseModel):
 class AccessTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, password):
+        return validate_password_strength(password)
+
+
+class PasswordResetRequestEmail(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, password):
+        return validate_password_strength(password)

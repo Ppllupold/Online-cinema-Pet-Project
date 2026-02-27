@@ -11,6 +11,7 @@ from src.database.models.accounts import (
     UserModel,
     ActivationTokenModel,
     RefreshTokenModel,
+    PasswordResetTokenModel,
 )
 from src.schemas.accounts import UserRegisterSchema
 from src.services.jwt import jwt_manager
@@ -231,3 +232,82 @@ async def revoke_all_user_tokens(db: AsyncSession, user_id: int) -> None:
         await db.delete(token)
 
     await db.flush()
+
+
+async def change_password(
+    db: AsyncSession, user: UserModel, old_password: str, new_password: str
+) -> None:
+
+    if not user.verify_password(old_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect old password"
+        )
+
+    if old_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from old password",
+        )
+
+    user.password = new_password
+
+    await db.flush()
+
+
+async def request_password_reset(
+    db: AsyncSession, email: str
+) -> PasswordResetTokenModel | None:
+
+    user = await db.scalar(
+        select(UserModel).where(func.lower(UserModel.email) == email.lower())
+    )
+
+    if not user or not user.is_active:
+        return None
+
+    await db.refresh(user, ["password_reset_token"])
+
+    if user.password_reset_token:
+        await db.delete(user.password_reset_token)
+        await db.flush()
+
+    reset_token = PasswordResetTokenModel(user_id=user.id)
+    db.add(reset_token)
+    await db.flush()
+    await db.refresh(reset_token)
+
+    return reset_token
+
+
+async def reset_password_with_token(
+    db: AsyncSession, token: str, new_password: str
+) -> UserModel:
+
+    reset_token = await db.scalar(
+        select(PasswordResetTokenModel).where(PasswordResetTokenModel.token == token)
+    )
+
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid password reset token"
+        )
+
+    if reset_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token has expired",
+        )
+
+    user: UserModel | None = await db.get(UserModel, reset_token.user_id)
+
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    user.password = new_password
+
+    await db.delete(reset_token)
+
+    await db.flush()
+    await db.refresh(user)
+
+    return user

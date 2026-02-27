@@ -6,8 +6,8 @@ from src.database.models import UserModel
 from src.dependencies.auth import get_current_user
 from src.dependencies.db import get_db
 from src.schemas.accounts import UserRegisterSchema, RenewActivationRequest, TokenResponse, LoginRequest, \
-    AccessTokenResponse, RefreshTokenRequest
-from src.services.email import send_activation_email
+    AccessTokenResponse, RefreshTokenRequest, PasswordChangeRequest, PasswordResetRequestEmail, PasswordResetConfirm
+from src.services.email import send_activation_email, send_password_reset_email
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
 
@@ -95,3 +95,59 @@ async def get_current_user_info(current_user: UserModel = Depends(get_current_us
         "is_active": current_user.is_active,
         "created_at": current_user.created_at,
     }
+
+
+
+@router.post("/password/change", status_code=200)
+async def change_password(
+        request: PasswordChangeRequest,
+        current_user: UserModel = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db)
+):
+    await accounts_crud.change_password(
+        db,
+        current_user,
+        request.old_password,
+        request.new_password
+    )
+
+    await db.commit()
+
+    return {"message": "Password changed successfully"}
+
+
+@router.post("/password/reset-request", status_code=200)
+async def request_password_reset(
+        request: PasswordResetRequestEmail,
+        db: AsyncSession = Depends(get_db)
+):
+    reset_token = await accounts_crud.request_password_reset(
+        db,
+        request.email
+    )
+
+    if reset_token:
+        await db.commit()
+
+        await send_password_reset_email(
+            to_email=request.email,
+            token=reset_token.token
+        )
+
+    return {
+        "message": "If this email is registered, you will receive a password reset link."
+    }
+
+
+@router.post("/password/reset-confirm", status_code=200)
+async def reset_password_confirm(
+        request: PasswordResetConfirm,
+        db: AsyncSession = Depends(get_db)
+):
+    user = await accounts_crud.reset_password_with_token(
+        db,
+        request.token,
+        request.new_password
+    )
+
+    return {"message": "Password has been reset successfully. You can now login."}

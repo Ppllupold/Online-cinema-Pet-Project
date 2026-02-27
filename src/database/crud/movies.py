@@ -5,11 +5,11 @@ from typing import Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import Select, distinct, func, select, or_
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from src.database.crud.shopping import check_movie_purchased
 from src.database.models import OrderItem, Order
+from src.database.models.accounts import FavoriteMoviesTable
 from src.database.models.movies import (
     MovieModel,
     Genre,
@@ -20,14 +20,12 @@ from src.database.models.movies import (
     MovieDirectorsTable,
     Certification,
 )
-from src.database.models.accounts import FavoriteMoviesTable
 from src.database.models.orders import StatusEnum
 from src.schemas.movies import (
     MovieFilterSchema,
     MovieListResponse,
     MoviesListItem,
     PaginationSchema,
-    MovieDetailResponse,
     MovieCreate,
     MovieUpdate,
 )
@@ -423,5 +421,20 @@ async def delete_movie(movie_id: int, db: AsyncSession):
     movie = await db.get(MovieModel, movie_id)
     if not movie:
         raise HTTPException(404, detail="Movie not found")
+
+    order_item = await db.scalar(
+        select(OrderItem)
+        .join(Order)
+        .where(
+            OrderItem.movie_id == movie_id,
+            Order.status == StatusEnum.PAID,
+        )
+        .limit(1)
+    )
+    if order_item:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You cant delete movies that was purchased at least once",
+        )
     await db.delete(movie)
     await db.flush()

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str
 
     SENDGRID_API_KEY: str
-    SEDGRID_FROM_EMAIL = str
+    SENDGRID_FROM_EMAIL: str
     DOMAIN: str = "http://127.0.0.1:8000 "
 
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"

@@ -18,7 +18,6 @@ class PaymentInitiateResponse(BaseModel):
 class PaymentItemDetail(BaseModel):
 
     id: int
-    movie_name: str
     price_at_payment: Decimal
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,12 +1,11 @@
 from decimal import Decimal
 
-from src.database.models import Cart, MovieModel, CartItem, OrderItem
-from fastapi import Depends, HTTPException, status
+from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, exists
 
+from src.database.models import Cart, MovieModel, CartItem, OrderItem
 from src.database.models.orders import StatusEnum, Order
-from src.dependencies.auth import get_current_user_cart
 from src.schemas.shopping import CartResponse, CartMovieItem
 
 

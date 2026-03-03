@@ -10,18 +10,17 @@ from src.routers.accounts import router as accounts_router
 from src.routers.payments import router as payments_router
 from src.routers.webhooks import router as webhooks_router
 
-
 settings = get_settings()
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
-app.include_router(stars_router, prefix="/api/v1", tags=["Stars"])
-app.include_router(genres_router, prefix="/api/v1", tags=["Genres"])
-app.include_router(movies_router, prefix="/api/v1", tags=["Movies"])
-app.include_router(orders_router, prefix="/api/v1", tags=["Orders"])
-app.include_router(shopping_router, prefix="/api/v1", tags=["Shopping"])
-app.include_router(accounts_router, prefix="/api/v1", tags=["Accounts"])
-app.include_router(payments_router, prefix="/api/v1", tags=["Payments"])
-app.include_router(webhooks_router, prefix="/api/v1", tags=["Webhooks"])
+app.include_router(stars_router, prefix="/api/v1")
+app.include_router(genres_router, prefix="/api/v1")
+app.include_router(movies_router, prefix="/api/v1")
+app.include_router(orders_router, prefix="/api/v1")
+app.include_router(shopping_router, prefix="/api/v1")
+app.include_router(accounts_router, prefix="/api/v1")
+app.include_router(payments_router, prefix="/api/v1")
+app.include_router(webhooks_router, prefix="/api/v1")
 
 
 # Health check

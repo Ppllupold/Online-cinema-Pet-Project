@@ -1,13 +1,13 @@
 from decimal import Decimal
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.crud.shopping import clear_cart
 from src.database.models import Order, Cart, OrderItem, MovieModel
 from src.database.models.orders import StatusEnum
-from src.schemas.orders import OrderListItem, OrderItemShort
+
 
 # crud/orders.py
 

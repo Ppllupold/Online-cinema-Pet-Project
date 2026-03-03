@@ -21,6 +21,28 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  postgres_test:
+    image: postgres:16
+    container_name: cinema_postgres_test
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: cinema_test
+      POSTGRES_USER: cinema_test_user
+      POSTGRES_PASSWORD: cinema_test_password
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U cinema_test_user -d cinema_test" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
+  postgres_test_data:
   postgres_data:

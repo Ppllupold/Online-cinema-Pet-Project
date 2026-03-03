@@ -64,7 +64,7 @@ async def create_user(
     db.add(activation_token)
 
     await db.flush()
-    await db.refresh(user)
+    await db.refresh(user, ["activation_token"])
 
     return user
 
@@ -131,7 +131,7 @@ async def create_activation_token(db: AsyncSession, email: str) -> ActivationTok
     await db.flush()
     await db.refresh(token)
 
-    return
+    return token
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> UserModel:

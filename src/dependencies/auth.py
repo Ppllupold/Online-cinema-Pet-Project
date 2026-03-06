@@ -17,8 +17,8 @@ ALGORITHM = "HS256"
 
 
 async def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security),
-        db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
 ) -> UserModel:
     token = credentials.credentials
 

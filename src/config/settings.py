@@ -48,8 +48,8 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 хвилин
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 днів
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     @property
     def async_db_url(self) -> str:

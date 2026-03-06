@@ -65,7 +65,7 @@ async def initiate_payment(
     )
 
 
-@router.get("/payments/{payment_id}", response_model=PaymentDetailResponse)
+@router.get("/{payment_id}", response_model=PaymentDetailResponse)
 async def get_payment(
     payment_id: int,
     user: UserModel = Depends(get_current_user),
@@ -80,7 +80,7 @@ async def get_payment(
     return payment
 
 
-@router.get("/payments", response_model=list[PaymentListItem])
+@router.get("/", response_model=list[PaymentListItem])
 async def get_my_payments(
     user: UserModel = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
@@ -95,7 +95,7 @@ async def payment_success(session_id: str | None = None):
         "status": "success",
         "message": "Payment completed successfully",
         "session_id": session_id,
-        "next_steps": "Check your email or GET /api/v1/orders to see your order"
+        "next_steps": "Check your email or GET /api/v1/orders to see your order",
     }
 
 
@@ -104,5 +104,5 @@ async def payment_cancel():
     return {
         "status": "cancelled",
         "message": "Payment was cancelled",
-        "next_steps": "Return to your cart and try again"
+        "next_steps": "Return to your cart and try again",
     }

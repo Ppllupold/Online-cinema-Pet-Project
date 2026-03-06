@@ -5,8 +5,17 @@ from src.database.crud import accounts as accounts_crud
 from src.database.models import UserModel
 from src.dependencies.auth import get_current_user
 from src.dependencies.db import get_db
-from src.schemas.accounts import UserRegisterSchema, RenewActivationRequest, TokenResponse, LoginRequest, \
-    AccessTokenResponse, RefreshTokenRequest, PasswordChangeRequest, PasswordResetRequestEmail, PasswordResetConfirm
+from src.schemas.accounts import (
+    UserRegisterSchema,
+    RenewActivationRequest,
+    TokenResponse,
+    LoginRequest,
+    AccessTokenResponse,
+    RefreshTokenRequest,
+    PasswordChangeRequest,
+    PasswordResetRequestEmail,
+    PasswordResetConfirm,
+)
 from src.services.email import send_activation_email, send_password_reset_email
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
@@ -48,6 +57,7 @@ async def renew_activation_link(
 
     return {"message": "New activation link has been sent to your email."}
 
+
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await accounts_crud.authenticate_user(
@@ -67,7 +77,9 @@ async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def refresh_token(
     request: RefreshTokenRequest, db: AsyncSession = Depends(get_db)
 ):
-    new_access_token = await accounts_crud.refresh_access_token(db, request.refresh_token)
+    new_access_token = await accounts_crud.refresh_access_token(
+        db, request.refresh_token
+    )
 
     return AccessTokenResponse(access_token=new_access_token, token_type="bearer")
 
@@ -97,18 +109,14 @@ async def get_current_user_info(current_user: UserModel = Depends(get_current_us
     }
 
 
-
 @router.post("/password/change", status_code=200)
 async def change_password(
-        request: PasswordChangeRequest,
-        current_user: UserModel = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db)
+    request: PasswordChangeRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     await accounts_crud.change_password(
-        db,
-        current_user,
-        request.old_password,
-        request.new_password
+        db, current_user, request.old_password, request.new_password
     )
 
     await db.commit()
@@ -118,21 +126,14 @@ async def change_password(
 
 @router.post("/password/reset-request", status_code=200)
 async def request_password_reset(
-        request: PasswordResetRequestEmail,
-        db: AsyncSession = Depends(get_db)
+    request: PasswordResetRequestEmail, db: AsyncSession = Depends(get_db)
 ):
-    reset_token = await accounts_crud.request_password_reset(
-        db,
-        request.email
-    )
+    reset_token = await accounts_crud.request_password_reset(db, request.email)
 
     if reset_token:
         await db.commit()
 
-        await send_password_reset_email(
-            to_email=request.email,
-            token=reset_token.token
-        )
+        await send_password_reset_email(to_email=request.email, token=reset_token.token)
 
     return {
         "message": "If this email is registered, you will receive a password reset link."
@@ -141,13 +142,10 @@ async def request_password_reset(
 
 @router.post("/password/reset-confirm", status_code=200)
 async def reset_password_confirm(
-        request: PasswordResetConfirm,
-        db: AsyncSession = Depends(get_db)
+    request: PasswordResetConfirm, db: AsyncSession = Depends(get_db)
 ):
     user = await accounts_crud.reset_password_with_token(
-        db,
-        request.token,
-        request.new_password
+        db, request.token, request.new_password
     )
 
     return {"message": "Password has been reset successfully. You can now login."}

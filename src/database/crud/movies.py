@@ -269,6 +269,12 @@ async def get_movies_list(
         .limit(per_page)
         .subquery()
     )
+    if order == "desc":
+        page_sort_key_col = page_subq.c.sort_key.desc()
+        page_id_col = page_subq.c.id.desc()
+    else:
+        page_sort_key_col = page_subq.c.sort_key.asc()
+        page_id_col = page_subq.c.id.asc()
 
     # 8. Завантажуємо повні об'єкти MovieModel для ids зі сторінки.
     #    JOIN гарантує що порядок збережеться (ORDER BY по page_subq).
@@ -277,7 +283,7 @@ async def get_movies_list(
         result = await db.scalars(
             select(MovieModel)
             .join(page_subq, MovieModel.id == page_subq.c.id)
-            .order_by(sort_key_col, id_col)
+            .order_by(page_sort_key_col, page_id_col)
         )
         movies = list(result.all())
 
@@ -318,6 +324,10 @@ async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieModel:
         )
         .where(MovieModel.id == movie_id)
     )
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Movie not Found"
+        )
     return movie
 
 

@@ -112,12 +112,8 @@ async def send_password_reset_email(to_email: str, token: str) -> bool:
         return False
 
 
-
 async def send_payment_status(
-        to_email: str,
-        order_id: int,
-        amount: float,
-        status: str
+    to_email: str, order_id: int, amount: float, status: str
 ) -> bool:
 
     subject = f"Payment {'Successful' if status == 'successful' else 'Failed'} - Order #{order_id}"
@@ -136,7 +132,7 @@ async def send_payment_status(
         from_email=settings.SENDGRID_FROM_EMAIL,
         to_emails=to_email,
         subject=subject,
-        html_content=html_content
+        html_content=html_content,
     )
 
     try:

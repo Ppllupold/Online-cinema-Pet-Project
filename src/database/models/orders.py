@@ -111,6 +111,14 @@ class OrderItem(Base):
         lazy="selectin",
     )
 
+    @property
+    def movie_name(self) -> str:
+        return self.movie.name
+
+    @property
+    def price(self) -> Decimal:
+        return self.price_at_order
+
     def __repr__(self) -> str:
         return (
             f"<OrderItem id={self.id} order_id={self.order_id} "

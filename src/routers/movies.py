@@ -22,6 +22,8 @@ async def get_movies(
     per_page: int = Query(10, ge=1, le=100, description="Items per page"),
     sort: movies_crud.SortField = Query("imdb", description="Sort by field"),
     order: movies_crud.SortOrder = Query("desc", description="Sort order"),
+    genres: list[str] | None = Query(None),
+    stars: list[str] | None = Query(None),
     filters: MovieFilterSchema = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
@@ -41,6 +43,8 @@ async def get_movies(
     - `sort`: year, imdb, price
     - `order`: asc, desc
     """
+    filters.genres = genres
+    filters.stars = stars
 
     return await movies_crud.get_movies_list(
         db,
@@ -93,10 +97,4 @@ async def update_movie(
 
 @router.delete("/{movie_id}", status_code=204)
 async def delete_movie(movie_id: int, db: AsyncSession = Depends(get_db)):
-    """
-    Delete a movie
-
-    TODO: Add validation to prevent deletion if movie has been purchased
-    """
-
     await movies_crud.delete_movie(movie_id, db)

@@ -19,7 +19,9 @@ class JWTManager:
         self.access_token_expire_minutes = settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
         self.refresh_token_expire_days = settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS
 
-    def create_access_token(self, user_id: int, additional_claims: Dict[str, Any] | None = None) -> str:
+    def create_access_token(
+        self, user_id: int, additional_claims: Dict[str, Any] | None = None
+    ) -> str:
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=self.access_token_expire_minutes
         )
@@ -54,11 +56,7 @@ class JWTManager:
 
     def decode_token(self, token: str, token_type: str | None = None) -> Dict[str, Any]:
         try:
-            payload = jwt.decode(
-                token,
-                self.secret_key,
-                algorithms=[self.algorithm]
-            )
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
 
             if token_type and payload.get("type") != token_type:
                 raise HTTPException(

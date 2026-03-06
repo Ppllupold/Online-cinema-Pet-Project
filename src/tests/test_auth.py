@@ -248,7 +248,10 @@ async def test_password_reset_confirm(
     await db_session.flush()
     response = await auth_client.post(
         f"/api/v1/accounts/password/reset-confirm",
-        json={"token": password_reset_token.token, "new_password": f"{STRONG_PASSWORD}stronger"}
+        json={
+            "token": password_reset_token.token,
+            "new_password": f"{STRONG_PASSWORD}stronger",
+        },
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {

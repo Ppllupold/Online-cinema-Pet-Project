@@ -1,13 +1,12 @@
 from decimal import Decimal
 
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.crud.shopping import clear_cart
 from src.database.models import Order, Cart, OrderItem, MovieModel
 from src.database.models.orders import StatusEnum
-
 
 # crud/orders.py
 
@@ -72,3 +71,24 @@ async def _validate_order(cart: Cart, db: AsyncSession) -> None:
             409,
             f"You have pending order #{existing_pending.id} with some of these movies",
         )
+
+
+async def cancel_order(order_id: int, cart: Cart, db: AsyncSession) -> None:
+    order = await db.scalar(
+        select(Order).where(Order.id == order_id, Order.user_id == cart.user_id)
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
+
+    if order.status == StatusEnum.CANCELED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Order already canceled"
+        )
+    if order.status == StatusEnum.PAID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Order already paid"
+        )
+    order.status = StatusEnum.CANCELED
+    await db.flush()

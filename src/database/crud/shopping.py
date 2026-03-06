@@ -10,7 +10,7 @@ from src.schemas.shopping import CartResponse, CartMovieItem
 
 
 async def add_movie_to_cart(movie_id: int, db: AsyncSession, cart: Cart):
-    movie = db.get(MovieModel, MovieModel.id == movie_id)
+    movie = await db.get(MovieModel, movie_id)
     if not movie:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"

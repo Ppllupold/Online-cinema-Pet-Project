@@ -1,5 +1,6 @@
 import os
 import asyncio
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -10,13 +11,22 @@ from sqlalchemy.pool import NullPool
 
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-ENV_TEST_PATH = PROJECT_ROOT / ".env.test"
-
-load_dotenv(ENV_TEST_PATH)
-
+from src.database.models import (
+    MovieModel,
+    Certification,
+    Genre,
+    Star,
+    Director,
+    Cart,
+    CartItem,
+    Payment,
+    OrderItem,
+    Order,
+)
 
 from src.database.models.base import Base
+from src.database.models.orders import StatusEnum
+from src.database.models.payments import PaymentStatusEnum
 from src.dependencies.db import get_db
 from src.services.jwt import jwt_manager
 from main import app
@@ -27,7 +37,9 @@ from src.database.models.accounts import (
     ActivationTokenModel,
     RefreshTokenModel,
 )
+from faker import Faker
 
+fake = Faker()
 TEST_DATABASE_URL = (
     f"postgresql+asyncpg://"
     f"{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
@@ -122,13 +134,108 @@ async def active_user(db_session: AsyncSession):
     user.is_active = True
     db_session.add(user)
     await db_session.flush()
-    token = RefreshTokenModel(user_id=user.id, token=jwt_manager.create_refresh_token(user.id))
+    token = RefreshTokenModel(
+        user_id=user.id, token=jwt_manager.create_refresh_token(user.id)
+    )
     db_session.add(token)
     await db_session.refresh(user, ["refresh_tokens"])
     return user
 
+
 @pytest_asyncio.fixture
-async def auth_client(client: AsyncClient, db_session: AsyncSession, active_user: UserModel):
+async def active_user_with_cart(db_session: AsyncSession, active_user):
+    db_session.add(Cart(user_id=active_user.id))
+    await db_session.flush()
+    await db_session.refresh(active_user, ["cart"])
+    return active_user
+
+
+@pytest_asyncio.fixture
+async def auth_client(
+    client: AsyncClient, db_session: AsyncSession, active_user: UserModel
+):
     token = jwt_manager.create_access_token(active_user.id)
     client.headers["Authorization"] = f"Bearer {token}"
     return client
+
+
+@pytest_asyncio.fixture
+async def active_user_with_cart_items(
+    db_session: AsyncSession, active_user_with_cart: UserModel, movie_factory
+):
+    movies = [await movie_factory() for _ in range(3)]
+    for movie in movies:
+        db_session.add(
+            CartItem(cart_id=active_user_with_cart.cart.id, movie_id=movie.id)
+        )
+    await db_session.flush()
+    await db_session.refresh(active_user_with_cart.cart, ["cart_items"])
+    return active_user_with_cart
+
+
+@pytest_asyncio.fixture
+async def movie_factory(db_session: AsyncSession):
+    async def create_movie(**kwargs) -> MovieModel:
+        certification = Certification(name=fake.unique.word())
+        db_session.add(certification)
+        await db_session.flush()
+
+        genre = Genre(name=fake.unique.word())
+        star = Star(name=fake.name())
+        director = Director(name=fake.name())
+        db_session.add_all([genre, star, director])
+        await db_session.flush()
+
+        movie = MovieModel(
+            name=kwargs.get("name", fake.sentence(nb_words=3)),
+            year=kwargs.get("year", 2000),
+            time=kwargs.get("time", 120),
+            imdb=kwargs.get("imdb", 7.0),
+            votes=kwargs.get("votes", 1000),
+            price=kwargs.get("price", Decimal("9.99")),
+            description=kwargs.get("description", fake.text()),
+            certification_id=certification.id,
+        )
+        movie.genres = kwargs.get("genres", [genre])
+        movie.stars = kwargs.get("stars", [star])
+        movie.directors = [director]
+
+        db_session.add(movie)
+        await db_session.flush()
+        await db_session.refresh(
+            movie, ["genres", "stars", "directors", "certification"]
+        )
+        return movie
+
+    return create_movie
+
+
+@pytest_asyncio.fixture
+async def create_valid_order(
+    db_session: AsyncSession, active_user_with_cart_items: UserModel
+):
+    valid_order = Order(
+        user_id=active_user_with_cart_items.id,
+        total_amount=Decimal(
+            sum(
+                cart_item.movie.price
+                for cart_item in active_user_with_cart_items.cart.cart_items
+            )
+        ),
+    )
+    db_session.add(valid_order)
+    await db_session.flush()
+    await db_session.refresh(valid_order)
+
+    order_items = [
+        OrderItem(
+            order_id=valid_order.id,
+            movie_id=item.movie_id,
+            price_at_order=item.movie.price,
+        )
+        for item in active_user_with_cart_items.cart.cart_items
+    ]
+    db_session.add_all(order_items)
+    await db_session.flush()
+    await db_session.refresh(valid_order, ["order_items"])
+    return valid_order

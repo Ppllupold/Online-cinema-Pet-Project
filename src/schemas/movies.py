@@ -3,8 +3,9 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-from src.schemas.genres import GenreListResponse
-from src.schemas.stars import StarListResponse
+from src.schemas.genres import GenreListResponse, GenreBase
+from src.schemas.stars import StarListResponse, StarBase
+from fastapi import Query
 
 
 class PaginationSchema(BaseModel):
@@ -23,8 +24,8 @@ class MovieFilterSchema(BaseModel):
     imdb_gte: Annotated[float | None, Field(ge=0, le=10)] = None
     price_lte: Annotated[Decimal | None, Field(ge=0)] = None
 
-    genres: list[str] | None = None
-    stars: list[str] | None = None
+    genres: Annotated[list[str] | None, Query()] = None
+    stars: Annotated[list[str] | None, Query()] = None
     director: str | None = None
 
     @field_validator("director", "q", mode="before")
@@ -99,8 +100,8 @@ class MovieDetailResponse(MoviesBase):
     gross: float | None = None
     description: str
     certification: CertificationForMoviesSchema
-    genres: list[GenreListResponse]
-    stars: list[StarListResponse]
+    genres: list[GenreBase]
+    stars: list[StarBase]
     directors: list[DirectorForMoviesSchema]
 
 

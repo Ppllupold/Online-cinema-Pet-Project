@@ -21,6 +21,6 @@ class OrderListItem(BaseModel):
     created_at: datetime
     status: StatusEnum
     total_amount: Decimal
-    items: list[OrderItemShort]
+    order_items: list[OrderItemShort]
 
     model_config = ConfigDict(from_attributes=True)

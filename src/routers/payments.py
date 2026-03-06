@@ -16,7 +16,25 @@ from src.schemas.payments import (
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 
-@router.post("/orders/{order_id}/pay", response_model=PaymentInitiateResponse)
+@router.post(
+    "/orders/{order_id}/pay",
+    response_model=PaymentInitiateResponse,
+    summary="Initiate payment for an order",
+    description=(
+        "Creates a Stripe Checkout session for the specified order. "
+        "The order must be in PENDING status, belong to the current user, and have items with up-to-date prices. "
+        "Returns a checkout URL to redirect the user to Stripe's payment page. "
+        "The session expires after a set period — if not paid in time, the order can be retried."
+    ),
+    responses={
+        200: {"description": "Checkout session created, redirect URL returned"},
+        400: {"description": "Order is not payable (wrong status or price mismatch)"},
+        403: {"description": "Order does not belong to current user"},
+        404: {"description": "Order not found"},
+        500: {"description": "Stripe error"},
+        401: {"description": "Not authenticated"},
+    },
+)
 async def initiate_payment(
     order_id: int,
     user: UserModel = Depends(get_current_user),
@@ -65,13 +83,26 @@ async def initiate_payment(
     )
 
 
-@router.get("/{payment_id}", response_model=PaymentDetailResponse)
+@router.get(
+    "/{payment_id}",
+    response_model=PaymentDetailResponse,
+    summary="Get payment by ID",
+    description=(
+        "Returns detailed information about a specific payment. "
+        "The payment must belong to the currently authenticated user."
+    ),
+    responses={
+        200: {"description": "Payment details returned"},
+        403: {"description": "Payment does not belong to current user"},
+        404: {"description": "Payment not found"},
+        401: {"description": "Not authenticated"},
+    },
+)
 async def get_payment(
     payment_id: int,
     user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
     payment = await payments_crud.get_payment_by_id(db, payment_id)
 
     if payment.user_id != user.id:
@@ -80,16 +111,35 @@ async def get_payment(
     return payment
 
 
-@router.get("/", response_model=list[PaymentListItem])
+@router.get(
+    "/",
+    response_model=list[PaymentListItem],
+    summary="Get my payments",
+    description="Returns a list of all payments made by the currently authenticated user.",
+    responses={
+        200: {"description": "List of payments returned"},
+        401: {"description": "Not authenticated"},
+    },
+)
 async def get_my_payments(
     user: UserModel = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
-
     payments = await payments_crud.get_user_payments(db, user.id)
     return [PaymentListItem.model_validate(p) for p in payments]
 
 
-@router.get("/payment-success")
+@router.get(
+    "/payment-success",
+    summary="Stripe payment success redirect",
+    description=(
+        "Landing page after a successful Stripe payment. "
+        "Stripe redirects the user here with the session_id query parameter. "
+        "Use GET /api/v1/orders to verify the order status."
+    ),
+    responses={
+        200: {"description": "Payment success confirmation"},
+    },
+)
 async def payment_success(session_id: str | None = None):
     return {
         "status": "success",
@@ -99,7 +149,17 @@ async def payment_success(session_id: str | None = None):
     }
 
 
-@router.get("/payment-cancel")
+@router.get(
+    "/payment-cancel",
+    summary="Stripe payment cancel redirect",
+    description=(
+        "Landing page after a cancelled Stripe payment. "
+        "Stripe redirects the user here if they close or cancel the checkout page."
+    ),
+    responses={
+        200: {"description": "Payment cancellation confirmation"},
+    },
+)
 async def payment_cancel():
     return {
         "status": "cancelled",

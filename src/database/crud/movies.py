@@ -38,10 +38,6 @@ SortField = Literal["year", "imdb", "price"]
 SortOrder = Literal["asc", "desc"]
 
 
-# ---------------------------------------------------------------------------
-# Маппінг поля сортування → колонка моделі.
-# Виноситимо в константу щоб не будувати dict при кожному виклику функції.
-# ---------------------------------------------------------------------------
 SORT_COLUMNS = {
     "year": MovieModel.year,
     "imdb": MovieModel.imdb,
@@ -66,7 +62,6 @@ def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
             )
         )
 
-    # --- Прості фільтри по полях самої таблиці movies ---
 
     if filters.year_gte is not None:
         stmt = stmt.where(MovieModel.year >= filters.year_gte)
@@ -77,9 +72,6 @@ def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
     if filters.price_lte is not None:
         stmt = stmt.where(MovieModel.price <= filters.price_lte)
 
-    # --- Фільтр по режисеру (AND — фільм має мати САМЕ цього режисера) ---
-    # JOIN з bridge-таблицею MovieDirectorsTable → Director,
-    # потім WHERE по імені (регістр ігнорується через lower()).
     if filters.director is not None:
         stmt = (
             stmt.join(
@@ -89,9 +81,6 @@ def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
             .where(func.lower(Director.name) == filters.director)
         )
 
-    # --- Фільтр по акторах (OR — фільм має мати ХОЧА Б ОДНОГО з переліку) ---
-    # JOIN з bridge-таблицею MovieStarsTable → Star,
-    # IN(...) — достатньо одного збігу.
     if filters.stars:
         stmt = (
             stmt.join(MovieStarsTable, MovieStarsTable.c.movie_id == MovieModel.id)
@@ -99,16 +88,6 @@ def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
             .where(func.lower(Star.name).in_(filters.stars))
         )
 
-    # --- Фільтр по жанрах (AND — фільм має мати ВСІ запитані жанри) ---
-    #
-    # Тут не можна просто написати WHERE genre IN (...) —
-    # це дало б OR-логіку (хоча б один жанр).
-    #
-    # Трюк: групуємо по movie_id і перевіряємо
-    # HAVING count(distinct genre) = кількість запитаних жанрів.
-    # Тобто: у фільму мають бути присутні ВСІ жанри зі списку.
-    #
-    # Робимо це через subquery щоб уникнути конфлікту з іншими JOIN вище.
     if filters.genres:
         genres_subq = (
             select(MovieGenresTable.c.movie_id.label("movie_id"))
@@ -123,9 +102,6 @@ def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
     return stmt
 
 
-# ---------------------------------------------------------------------------
-# Побудова базового SELECT з усіма фільтрами.
-# Повертає SQLAlchemy Select — ще не виконаний запит, просто об'єкт.
 def _build_ids_subquery(stmt: Select, sort_col):
     return (
         stmt.with_only_columns(
@@ -137,17 +113,6 @@ def _build_ids_subquery(stmt: Select, sort_col):
     )
 
 
-# ---------------------------------------------------------------------------
-# Будуємо "ids subquery" — серце всієї пагінації.
-#
-# Ця subquery вибирає пари (id, sort_key) для відфільтрованих фільмів.
-# DISTINCT тут критичний: якщо фільм має кількох акторів/жанрів,
-# JOIN-и можуть продублювати рядки. DISTINCT прибирає дублі.
-#
-# Повертаємо subquery об'єкт — він буде використаний двічі:
-#   1) для підрахунку total_items (COUNT)
-#   2) для вибірки конкретної сторінки (OFFSET/LIMIT)
-# ---------------------------------------------------------------------------
 def _build_page_url(
     page: int,
     per_page: int,
@@ -180,15 +145,6 @@ def _build_page_url(
     return f"{MOVIE_LIST_URL}?" + "&".join(params)
 
 
-# ---------------------------------------------------------------------------
-# Серіалізуємо фільтри у query-string параметри для URL пагінації.
-#
-# БУЛО: next_page не включав фільтри → при переході на стор. 2
-#       всі фільтри (жанр, актор тощо) губились.
-#
-# СТАЛО: всі активні фільтри додаються до URL.
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 def _validate_pagination(page: int, per_page: int) -> None:
     if page < 1:
         raise HTTPException(
@@ -202,9 +158,6 @@ def _validate_pagination(page: int, per_page: int) -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Головна функція — оркеструє все вище.
-# ---------------------------------------------------------------------------
 async def get_movies_list(
     db: AsyncSession,
     *,
@@ -217,16 +170,12 @@ async def get_movies_list(
     user_id: int | None = None,
 ) -> MovieListResponse:
 
-    # 1. Перевіряємо коректність параметрів пагінації
     _validate_pagination(page, per_page)
 
     filters = filters or MovieFilterSchema()
 
-    # 2. Отримуємо колонку сортування один раз —
-    #    далі передаємо її як аргумент, не шукаємо знову
     sort_col = _get_sort_column(sort)
 
-    # 3. Будуємо відфільтрований SELECT (ще не виконуємо)
     base_stmt = _build_filtered_stmt(filters)
     if favorites and user_id:
         base_stmt = base_stmt.join(
@@ -235,25 +184,17 @@ async def get_movies_list(
             (FavoriteMoviesTable.c.user_id == user_id),
         )
 
-    # 4. Будуємо ids_subquery — використовується двічі нижче.
-    #    Це ключова оптимізація: раніше subquery будувалась окремо
-    #    в _count_total_items і окремо в _fetch_movies_page.
     ids_subq = _build_ids_subquery(base_stmt, sort_col)
 
-    # 5. Підраховуємо загальну кількість фільмів (без OFFSET/LIMIT).
-    #    SELECT COUNT(*) FROM (SELECT DISTINCT id, sort_key FROM ...) AS subq
     total_items = int(await db.scalar(select(func.count()).select_from(ids_subq)))
     total_pages = math.ceil(total_items / per_page) if total_items > 0 else 0
 
-    # 6. Перевіряємо що запитана сторінка існує
     if total_pages > 0 and page > total_pages:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="page number out of total pages range",
         )
 
-    # 7. Вибираємо ids для конкретної сторінки (з сортуванням і OFFSET/LIMIT).
-    #    Спочатку визначаємо напрямок сортування для sort_key і id.
     if order == "desc":
         sort_key_col = ids_subq.c.sort_key.desc()
         id_col = ids_subq.c.id.desc()
@@ -261,7 +202,6 @@ async def get_movies_list(
         sort_key_col = ids_subq.c.sort_key.asc()
         id_col = ids_subq.c.id.asc()
 
-    # SELECT id, sort_key FROM ids_subq ORDER BY ... OFFSET ... LIMIT ...
     page_subq = (
         select(ids_subq)
         .order_by(sort_key_col, id_col)
@@ -276,8 +216,6 @@ async def get_movies_list(
         page_sort_key_col = page_subq.c.sort_key.asc()
         page_id_col = page_subq.c.id.asc()
 
-    # 8. Завантажуємо повні об'єкти MovieModel для ids зі сторінки.
-    #    JOIN гарантує що порядок збережеться (ORDER BY по page_subq).
     movies: list[MovieModel] = []
     if total_items > 0:
         result = await db.scalars(
@@ -287,8 +225,6 @@ async def get_movies_list(
         )
         movies = list(result.all())
 
-    # 9. Будуємо URL наступної/попередньої сторінки з усіма фільтрами.
-    #    БУЛО: фільтри губились в URL. СТАЛО: всі параметри зберігаються.
     next_page = (
         _build_page_url(page + 1, per_page, sort, order, filters)
         if total_pages > 0 and page < total_pages

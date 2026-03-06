@@ -4,12 +4,10 @@ from unittest.mock import patch, AsyncMock
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import UserModel, RefreshTokenModel, PasswordResetTokenModel
-from sqlalchemy import select
-
-from src.services.jwt import jwt_manager
 
 REGISTER_URL = "/api/v1/accounts/register"
 STRONG_PASSWORD = "8f6@E6hR~<T1w"

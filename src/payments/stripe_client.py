@@ -1,4 +1,3 @@
-# src/payments/stripe_client.py
 
 import stripe
 from decimal import Decimal

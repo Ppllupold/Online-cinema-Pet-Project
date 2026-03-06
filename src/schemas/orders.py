@@ -1,4 +1,3 @@
-# schemas/orders.py
 
 from datetime import datetime
 from decimal import Decimal

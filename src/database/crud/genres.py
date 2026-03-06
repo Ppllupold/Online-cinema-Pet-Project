@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models.movies import Genre, MovieGenresTable
-from src.schemas.genres import GenreCreate, GenreUpdate, GenreDetailResponse
+from src.schemas.genres import GenreCreate, GenreUpdate
 
 
 async def get_all_genres(db: AsyncSession) -> list[Genre]:

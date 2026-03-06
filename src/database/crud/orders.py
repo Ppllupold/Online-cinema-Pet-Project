@@ -8,7 +8,6 @@ from src.database.crud.shopping import clear_cart
 from src.database.models import Order, Cart, OrderItem, MovieModel
 from src.database.models.orders import StatusEnum
 
-# crud/orders.py
 
 
 async def get_orders(user_id: int, db: AsyncSession) -> list[Order]:

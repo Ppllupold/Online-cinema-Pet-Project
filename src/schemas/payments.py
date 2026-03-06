@@ -1,5 +1,3 @@
-# src/schemas/payments.py
-
 from datetime import datetime
 from decimal import Decimal
 

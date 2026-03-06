@@ -1,10 +1,11 @@
 from decimal import Decimal
+
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException
 
-from src.database.models.payments import Payment, PaymentItem, PaymentStatusEnum
 from src.database.models.orders import Order, StatusEnum
+from src.database.models.payments import Payment, PaymentItem, PaymentStatusEnum
 
 
 async def validate_order_for_payment(

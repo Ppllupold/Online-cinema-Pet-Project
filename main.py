@@ -23,7 +23,6 @@ app.include_router(payments_router, prefix="/api/v1")
 app.include_router(webhooks_router, prefix="/api/v1")
 
 
-# Health check
 @app.get("/", tags=["Health"])
 async def root():
     return {
@@ -45,5 +44,5 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,  # auto-reload при змінах коду
+        reload=True,
     )

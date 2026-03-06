@@ -1,16 +1,15 @@
-import os
 import asyncio
+import os
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from faker import Faker
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
-from dotenv import load_dotenv
-
+from main import app
 from src.database.models import (
     MovieModel,
     Certification,
@@ -19,17 +18,9 @@ from src.database.models import (
     Director,
     Cart,
     CartItem,
-    Payment,
     OrderItem,
     Order,
 )
-
-from src.database.models.base import Base
-from src.database.models.orders import StatusEnum
-from src.database.models.payments import PaymentStatusEnum
-from src.dependencies.db import get_db
-from src.services.jwt import jwt_manager
-from main import app
 from src.database.models.accounts import (
     UserGroupEnum,
     UserGroup,
@@ -37,7 +28,9 @@ from src.database.models.accounts import (
     ActivationTokenModel,
     RefreshTokenModel,
 )
-from faker import Faker
+from src.database.models.base import Base
+from src.dependencies.db import get_db
+from src.services.jwt import jwt_manager
 
 fake = Faker()
 TEST_DATABASE_URL = (
@@ -63,7 +56,6 @@ TestSessionLocal = async_sessionmaker(
 
 @pytest.fixture(scope="session")
 def event_loop():
-    """Event loop для async тестів"""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
@@ -71,12 +63,6 @@ def event_loop():
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session():
-    """
-    Database session для тесту
-
-    - Створює таблиці
-    - Після тесту очищує
-    """
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -96,8 +82,6 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession):
-    """HTTP client для тестування API"""
-
     async def override_get_db():
         try:
             yield db_session

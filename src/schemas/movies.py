@@ -1,11 +1,11 @@
 from decimal import Decimal
 from typing import Annotated
 
+from fastapi import Query
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-from src.schemas.genres import GenreListResponse, GenreBase
-from src.schemas.stars import StarListResponse, StarBase
-from fastapi import Query
+from src.schemas.genres import GenreBase
+from src.schemas.stars import StarBase
 
 
 class PaginationSchema(BaseModel):

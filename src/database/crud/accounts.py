@@ -1,10 +1,8 @@
-# src/crud/users.py
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from src.config.settings import get_settings
 from src.database.models.accounts import (

@@ -16,7 +16,6 @@ if config.config_file_name is not None:
 
 settings = get_settings()
 
-# Metadata для autogenerate
 target_metadata = Base.metadata
 
 

@@ -1,0 +1,386 @@
+from __future__ import annotations
+
+import math
+from typing import Literal
+
+from fastapi import HTTPException, status
+from sqlalchemy import Select, distinct, func, select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from src.database.models import OrderItem, Order
+from src.database.models.accounts import FavoriteMoviesTable
+from src.database.models.movies import (
+    MovieModel,
+    Genre,
+    Star,
+    Director,
+    MovieGenresTable,
+    MovieStarsTable,
+    MovieDirectorsTable,
+    Certification,
+)
+from src.database.models.orders import StatusEnum
+from src.schemas.movies import (
+    MovieFilterSchema,
+    MovieListResponse,
+    MoviesListItem,
+    PaginationSchema,
+    MovieCreate,
+    MovieUpdate,
+)
+
+DEFAULT_PER_PAGE = 10
+DEFAULT_PAGE = 1
+MOVIE_LIST_URL = "/api/v1/movies"
+
+SortField = Literal["year", "imdb", "price"]
+SortOrder = Literal["asc", "desc"]
+
+
+SORT_COLUMNS = {
+    "year": MovieModel.year,
+    "imdb": MovieModel.imdb,
+    "price": MovieModel.price,
+}
+
+
+def _get_sort_column(sort: SortField):
+    return SORT_COLUMNS[sort]
+
+
+def _build_filtered_stmt(filters: MovieFilterSchema) -> Select:
+
+    stmt: Select = select(MovieModel)
+
+    if filters.q is not None:
+        search_term = f"%{filters.q}%"
+        stmt = stmt.where(
+            or_(
+                MovieModel.name.ilike(search_term),
+                MovieModel.description.ilike(search_term),
+            )
+        )
+
+
+    if filters.year_gte is not None:
+        stmt = stmt.where(MovieModel.year >= filters.year_gte)
+
+    if filters.imdb_gte is not None:
+        stmt = stmt.where(MovieModel.imdb >= filters.imdb_gte)
+
+    if filters.price_lte is not None:
+        stmt = stmt.where(MovieModel.price <= filters.price_lte)
+
+    if filters.director is not None:
+        stmt = (
+            stmt.join(
+                MovieDirectorsTable, MovieDirectorsTable.c.movie_id == MovieModel.id
+            )
+            .join(Director, Director.id == MovieDirectorsTable.c.director_id)
+            .where(func.lower(Director.name) == filters.director)
+        )
+
+    if filters.stars:
+        stmt = (
+            stmt.join(MovieStarsTable, MovieStarsTable.c.movie_id == MovieModel.id)
+            .join(Star, Star.id == MovieStarsTable.c.star_id)
+            .where(func.lower(Star.name).in_(filters.stars))
+        )
+
+    if filters.genres:
+        genres_subq = (
+            select(MovieGenresTable.c.movie_id.label("movie_id"))
+            .join(Genre, Genre.id == MovieGenresTable.c.genre_id)
+            .where(func.lower(Genre.name).in_(filters.genres))
+            .group_by(MovieGenresTable.c.movie_id)
+            .having(func.count(distinct(func.lower(Genre.name))) == len(filters.genres))
+            .subquery()
+        )
+        stmt = stmt.where(MovieModel.id.in_(select(genres_subq.c.movie_id)))
+
+    return stmt
+
+
+def _build_ids_subquery(stmt: Select, sort_col):
+    return (
+        stmt.with_only_columns(
+            MovieModel.id.label("id"),
+            sort_col.label("sort_key"),
+        )
+        .distinct()
+        .subquery()
+    )
+
+
+def _build_page_url(
+    page: int,
+    per_page: int,
+    sort: SortField,
+    order: SortOrder,
+    filters: MovieFilterSchema,
+) -> str:
+    params = [
+        f"page={page}",
+        f"per_page={per_page}",
+        f"sort={sort}",
+        f"order={order}",
+    ]
+
+    if filters.q is not None:
+        params.append(f"q={filters.q}")
+    if filters.year_gte is not None:
+        params.append(f"year_gte={filters.year_gte}")
+    if filters.imdb_gte is not None:
+        params.append(f"imdb_gte={filters.imdb_gte}")
+    if filters.price_lte is not None:
+        params.append(f"price_lte={filters.price_lte}")
+    if filters.director is not None:
+        params.append(f"director={filters.director}")
+    for star in filters.stars or []:
+        params.append(f"stars={star}")
+    for genre in filters.genres or []:
+        params.append(f"genres={genre}")
+
+    return f"{MOVIE_LIST_URL}?" + "&".join(params)
+
+
+def _validate_pagination(page: int, per_page: int) -> None:
+    if page < 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="page must be >= 1",
+        )
+    if per_page < 1 or per_page > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="per_page must be between 1 and 100",
+        )
+
+
+async def get_movies_list(
+    db: AsyncSession,
+    *,
+    page: int = DEFAULT_PAGE,
+    per_page: int = DEFAULT_PER_PAGE,
+    filters: MovieFilterSchema | None = None,
+    sort: SortField = "imdb",
+    order: SortOrder = "desc",
+    favorites: bool = False,
+    user_id: int | None = None,
+) -> MovieListResponse:
+
+    _validate_pagination(page, per_page)
+
+    filters = filters or MovieFilterSchema()
+
+    sort_col = _get_sort_column(sort)
+
+    base_stmt = _build_filtered_stmt(filters)
+    if favorites and user_id:
+        base_stmt = base_stmt.join(
+            FavoriteMoviesTable,
+            (FavoriteMoviesTable.c.movie_id == MovieModel.id),
+            (FavoriteMoviesTable.c.user_id == user_id),
+        )
+
+    ids_subq = _build_ids_subquery(base_stmt, sort_col)
+
+    total_items = int(await db.scalar(select(func.count()).select_from(ids_subq)))
+    total_pages = math.ceil(total_items / per_page) if total_items > 0 else 0
+
+    if total_pages > 0 and page > total_pages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="page number out of total pages range",
+        )
+
+    if order == "desc":
+        sort_key_col = ids_subq.c.sort_key.desc()
+        id_col = ids_subq.c.id.desc()
+    else:
+        sort_key_col = ids_subq.c.sort_key.asc()
+        id_col = ids_subq.c.id.asc()
+
+    page_subq = (
+        select(ids_subq)
+        .order_by(sort_key_col, id_col)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .subquery()
+    )
+    if order == "desc":
+        page_sort_key_col = page_subq.c.sort_key.desc()
+        page_id_col = page_subq.c.id.desc()
+    else:
+        page_sort_key_col = page_subq.c.sort_key.asc()
+        page_id_col = page_subq.c.id.asc()
+
+    movies: list[MovieModel] = []
+    if total_items > 0:
+        result = await db.scalars(
+            select(MovieModel)
+            .join(page_subq, MovieModel.id == page_subq.c.id)
+            .order_by(page_sort_key_col, page_id_col)
+        )
+        movies = list(result.all())
+
+    next_page = (
+        _build_page_url(page + 1, per_page, sort, order, filters)
+        if total_pages > 0 and page < total_pages
+        else None
+    )
+    previous_page = (
+        _build_page_url(page - 1, per_page, sort, order, filters)
+        if total_pages > 0 and page > 1
+        else None
+    )
+
+    pagination = PaginationSchema(
+        page=page,
+        per_page=per_page,
+        next_page=next_page,
+        previous_page=previous_page,
+        total_pages=total_pages,
+        total_items=total_items,
+    )
+
+    items = [MoviesListItem.model_validate(m) for m in movies]
+
+    return MovieListResponse(items=items, pagination=pagination)
+
+
+async def get_movie_by_id(movie_id: int, db: AsyncSession) -> MovieModel:
+    movie = await db.scalar(
+        select(MovieModel)
+        .options(
+            selectinload(MovieModel.genres),
+            selectinload(MovieModel.stars),
+            # ...
+        )
+        .where(MovieModel.id == movie_id)
+    )
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Movie not Found"
+        )
+    return movie
+
+
+async def create_movie(schema: MovieCreate, db: AsyncSession) -> MovieModel:
+    certification: Certification | None = await db.get(
+        Certification, schema.certification_id
+    )
+    if not certification:
+        raise HTTPException(status_code=404, detail="Certification not found")
+
+    genres = (
+        await db.scalars(select(Genre).where(Genre.id.in_(schema.genre_ids)))
+    ).all()
+    if len(genres) != len(schema.genre_ids):
+        raise HTTPException(status_code=404, detail="Some genres not found")
+
+    stars = (await db.scalars(select(Star).where(Star.id.in_(schema.star_ids)))).all()
+    if len(stars) != len(schema.star_ids):
+        raise HTTPException(status_code=404, detail="Some stars not found")
+
+    directors = (
+        await db.scalars(select(Director).where(Director.id.in_(schema.director_ids)))
+    ).all()
+    if len(directors) != len(schema.director_ids):
+        raise HTTPException(status_code=404, detail="Some directors not found")
+
+    movie = MovieModel(
+        **schema.model_dump(
+            exclude={"genre_ids", "star_ids", "director_ids", "certification_id"}
+        ),
+        certification=certification,
+        genres=list(genres),
+        stars=list(stars),
+        directors=list(directors),
+    )
+
+    db.add(movie)
+    await db.flush()
+    await db.refresh(movie)
+
+    return movie
+
+
+async def update_movie(
+    movie_id: int, schema: MovieUpdate, db: AsyncSession
+) -> MovieModel:
+    movie = await db.get(MovieModel, movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    update_data = schema.model_dump(exclude_unset=True)
+
+    if "certification_id" in update_data:
+        certification = await db.get(Certification, update_data["certification_id"])
+        if not certification:
+            raise HTTPException(status_code=404, detail="Certification not found")
+        movie.certification = certification
+        update_data.pop("certification_id")
+
+    if "genre_ids" in update_data:
+        genres = (
+            await db.scalars(
+                select(Genre).where(Genre.id.in_(update_data["genre_ids"]))
+            )
+        ).all()
+        if len(genres) != len(update_data["genre_ids"]):
+            raise HTTPException(status_code=404, detail="Some genres not found")
+        movie.genres = list(genres)
+        update_data.pop("genre_ids")
+
+    if "star_ids" in update_data:
+        stars = (
+            await db.scalars(select(Star).where(Star.id.in_(update_data["star_ids"])))
+        ).all()
+        if len(stars) != len(update_data["star_ids"]):
+            raise HTTPException(status_code=404, detail="Some stars not found")
+        movie.stars = list(stars)
+        update_data.pop("star_ids")
+
+    if "director_ids" in update_data:
+        directors = (
+            await db.scalars(
+                select(Director).where(Director.id.in_(update_data["director_ids"]))
+            )
+        ).all()
+        if len(directors) != len(update_data["director_ids"]):
+            raise HTTPException(status_code=404, detail="Some directors not found")
+        movie.directors = list(directors)
+        update_data.pop("director_ids")
+
+    for field, value in update_data.items():
+        setattr(movie, field, value)
+
+    await db.flush()
+    await db.refresh(movie)
+
+    return movie
+
+
+async def delete_movie(movie_id: int, db: AsyncSession):
+    movie = await db.get(MovieModel, movie_id)
+    if not movie:
+        raise HTTPException(404, detail="Movie not found")
+
+    order_item = await db.scalar(
+        select(OrderItem)
+        .join(Order)
+        .where(
+            OrderItem.movie_id == movie_id,
+            Order.status == StatusEnum.PAID,
+        )
+        .limit(1)
+    )
+    if order_item:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You cant delete movies that was purchased at least once",
+        )
+    await db.delete(movie)
+    await db.flush()

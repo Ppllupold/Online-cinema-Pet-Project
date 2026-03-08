@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.database.session import AsyncSessionLocal
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as db:
+        try:
+            yield db
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
